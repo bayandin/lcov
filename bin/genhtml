@@ -93,6 +93,7 @@ use Storable qw(dclone);
 use FindBin;
 use Time::HiRes;    # for profiling
 use Storable;
+use JSON;
 
 use lib "$FindBin::RealBin/../lib";
 use lcovutil qw (set_tool_name define_errors parse_ignore_errors
@@ -5775,6 +5776,7 @@ END_OF_USAGE
 sub print_overall_rate($$$$$)
 {
     my ($currentTrace, $ln_do, $fn_do, $br_do, $summary) = @_;
+    my %data;
 
     # use verbosity level -1:  so print unless user says "-q -q"...really quiet
     info(-1, "Overall coverage rate:\n");
@@ -5797,6 +5799,10 @@ sub print_overall_rate($$$$$)
              get_overall_line($summary->get("found", $type),
                               $summary->get("hit", $type),
                               $name));
+        $data{$name}{'_summary'} = get_overall_line($summary->get("found", $type),
+                                                    $summary->get("hit", $type),
+                                                    $name);
+
         if ($main::show_tla) {
             for my $tla (@SummaryInfo::tlaPriorityOrder) {
                 my $v = $summary->get($tla, $type);
@@ -5806,10 +5812,23 @@ sub print_overall_rate($$$$$)
                     $SummaryInfo::tlaToLegacySrcLabel{$tla} :
                     $tla;
                 info(-1, "       $label...: $v\n");
+                $data{$name}{$label} = $v;
             }
         }
     }
+
+    save_as_json(\%data);
     summarize_cov_filters();
+}
+
+sub save_as_json {
+    my ($data_ref) = @_;
+
+    my $json_str = encode_json($data_ref);
+
+    open my $fh, '>', File::Spec->catfile($output_directory, 'summary.json') or die "Failed to open file: $!";
+    print $fh $json_str;
+    close $fh;
 }
 
 #
